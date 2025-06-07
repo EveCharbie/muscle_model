@@ -54,13 +54,13 @@ def degroote_equation(muscle_force):
 
 
 def isovolume_equation(muscle_force_normalize, volume, coeff):
-    muscle_force = muscle_force_normalize / 2
+    muscle_force = muscle_force_normalize * 0.8
     if volume is None:
-        volume = 0.5 * 0.1  # Initial configuration
+        volume = 0.5 * 0.01  # Initial configuration
         coeff = 0.1
 
-    theta_isovolume = (np.arccos(muscle_force / mass_force))
-    muscle_fiber_length_isovolume = np.sqrt(np.tan(theta_isovolume) * coeff * volume)
+    theta_isovolume = np.arccos(muscle_force / mass_force)
+    muscle_fiber_length_isovolume = np.sqrt(np.tan(theta_isovolume) * volume / coeff)
     muscle_fiber_width_isovolume = volume / muscle_fiber_length_isovolume
     phi = np.pi/2 - theta_isovolume
 
@@ -138,8 +138,8 @@ ax_slider_1 = plt.axes([0.25, 0.01, 0.65, 0.03], facecolor='lightgoldenrodyellow
 ax_slider_2 = plt.axes([0.25, 0.05, 0.65, 0.03], facecolor='lightgoldenrodyellow')
 ax_slider_3 = plt.axes([0.25, 0.09, 0.65, 0.03], facecolor='lightgoldenrodyellow')
 slider_force = Slider(ax_slider_1, 'Muscle force', 5.0, 10.0, valinit=5.5, valstep=0.1)
-slider_volume = Slider(ax_slider_2, 'Volume', 0.01, 1.0, valinit=0.1, valstep=0.05)
-slider_coeff = Slider(ax_slider_3, 'Coeff', 0.001, 1.0, valinit=0.1, valstep=0.05)
+slider_volume = Slider(ax_slider_2, 'Volume', 0.0001, 0.1, valinit=0.001, valstep=0.01)
+slider_coeff = Slider(ax_slider_3, 'Coeff', 0.001, 0.5, valinit=0.05, valstep=0.01)
 
 # Update function for the slider
 def update(val):
