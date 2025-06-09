@@ -1,9 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
-from matplotlib.patches import Circle, Rectangle
-import casadi as cas
-
+from matplotlib.patches import Circle
 
 
 # Connect the slider to the update function
@@ -40,32 +38,31 @@ def degroote_equation(muscle_force):
 #
 #     return muscle_fiber_length_isovolume, muscle_fiber_width_isovolume, theta_isovolume
 
-# def isovolume_equation(muscle_force_normalize):
-#     volume = 0.5 * 0.5  # Initial configuration
-#     muscle_force = muscle_force_normalize / 2
-#     coeff = 0.5
-#
-#     theta_isovolume = np.arccos(muscle_force / mass_force)
-#     muscle_fiber_length_isovolume = np.sqrt(volume * np.tan(theta_isovolume) * coeff)
-#     muscle_fiber_width_isovolume = volume / muscle_fiber_length_isovolume
-#     phi = np.pi/2 - theta_isovolume
-#
-#     return muscle_fiber_length_isovolume, muscle_fiber_width_isovolume, theta_isovolume
 
-
-def isovolume_equation(muscle_force_normalize, volume, coeff):
+def isovolume_equation(muscle_force_normalize, volume):
     muscle_force = muscle_force_normalize * 0.8
     if volume is None:
-        volume = 0.5 * 0.01  # Initial configuration
-        coeff = 0.1
+        volume = 0.08  # Initial configuration
 
     theta_isovolume = np.arccos(muscle_force / mass_force)
-    muscle_fiber_length_isovolume = np.sqrt(np.tan(theta_isovolume) * volume / coeff)
+    muscle_fiber_length_isovolume = np.sqrt(volume / np.tan(theta_isovolume))
     muscle_fiber_width_isovolume = volume / muscle_fiber_length_isovolume
-    phi = np.pi/2 - theta_isovolume
 
     return muscle_fiber_length_isovolume, muscle_fiber_width_isovolume, theta_isovolume
 
+
+def isovolume_equation(muscle_force, volume):
+    """
+    Do not consider the vertical component of Fw since it is applied in both directions.
+    """
+    if volume is None:
+        volume = 0.08  # Initial configuration
+
+    theta_isovolume = np.arccos(mass_force / muscle_force)
+    muscle_fiber_length_isovolume = np.sqrt(volume / np.tan(theta_isovolume))
+    muscle_fiber_width_isovolume = volume / muscle_fiber_length_isovolume
+
+    return muscle_fiber_length_isovolume, muscle_fiber_width_isovolume, theta_isovolume
 
 # Create a figure and axis
 fig, axs = plt.subplots(2, 2, figsize=(7, 7))
@@ -102,10 +99,10 @@ y_degroote = np.zeros((30, ))
 y_isovolume = np.zeros((30, ))
 for i in range(30):
     y_degroote[i], _ = degroote_equation(x_array[i])
-    y_isovolume[i], _, _ = isovolume_equation(x_array[i], None, None)
+    y_isovolume[i], _, _ = isovolume_equation(x_array[i], None)
 
 axs[2].plot(x_array, y_degroote, "-g", label="DeGroote")
-axs[2].plot(x_array, y_isovolume, "-m", label="IsoVolume")
+plot_isovolume = axs[2].plot(x_array, y_isovolume, "-m", label="IsoVolume")
 axs[2].legend(bbox_to_anchor=(1.05, 0.5))
 
 
@@ -128,18 +125,14 @@ axs[0].add_patch(mass_degroote)
 
 mass_isovolume = Circle((0, -muscle_length-3*tendon_length), mass_radius, edgecolor='blue', facecolor='lightblue', alpha=0.6)
 axs[1].add_patch(mass_isovolume)
-rectangle_isovolume = Rectangle((-muscle_width/2, -tendon_length), width=muscle_width, height=-muscle_length, color='black', alpha=0.2)
-axs[1].add_patch(rectangle_isovolume)
 
 vertical_line = axs[2].plot(np.array([5.5, 5.5]), np.array([-0, 1]), "--k")
 
 # Set up the slider
 ax_slider_1 = plt.axes([0.25, 0.01, 0.65, 0.03], facecolor='lightgoldenrodyellow')
 ax_slider_2 = plt.axes([0.25, 0.05, 0.65, 0.03], facecolor='lightgoldenrodyellow')
-ax_slider_3 = plt.axes([0.25, 0.09, 0.65, 0.03], facecolor='lightgoldenrodyellow')
 slider_force = Slider(ax_slider_1, 'Muscle force', 5.0, 10.0, valinit=5.5, valstep=0.1)
-slider_volume = Slider(ax_slider_2, 'Volume', 0.0001, 0.1, valinit=0.001, valstep=0.01)
-slider_coeff = Slider(ax_slider_3, 'Coeff', 0.001, 0.5, valinit=0.05, valstep=0.01)
+slider_volume = Slider(ax_slider_2, 'Volume', 0.0001, 0.2, valinit=0.08, valstep=0.01)
 
 # Update function for the slider
 def update(val):
@@ -157,7 +150,7 @@ def update(val):
         mass_degroote.set_center((0, -3*tendon_length-2*attachment-vertical_length_degroote))
         return
 
-    def update_visual_isovolume(muscle_fiber_length_isovolume, muscle_fiber_width_isovolume, theta_isovolume):
+    def update_visual_isovolume(muscle_fiber_length_isovolume, muscle_fiber_width_isovolume, theta_isovolume, volume):
         muscle_length_isovolume = 2*attachment + muscle_fiber_length_isovolume * np.cos(theta_isovolume)
         muscle_width_isovolume = muscle_fiber_length_isovolume * np.sin(theta_isovolume)
 
@@ -170,25 +163,27 @@ def update(val):
         tendon_bottom_isovolume[0].set_ydata(np.array([-muscle_length_isovolume - 2 * tendon_length, -muscle_length_isovolume - tendon_length]))
         muscle_isovolume[0].set_xdata(np.array([-muscle_width_isovolume / 2, muscle_width_isovolume / 2]))
         muscle_isovolume[0].set_ydata(np.array([-tendon_length - attachment, -tendon_length - muscle_length_isovolume + attachment]))
-        # muscle_isovolume[0].set_linewidth(muscle_fiber_width_isovolume)
+        muscle_isovolume[0].set_linewidth(muscle_fiber_width_isovolume * 10)
 
         mass_isovolume.set_center((0, -muscle_length_isovolume - 3 * tendon_length))
-        rectangle_isovolume.set_xy((-muscle_width_isovolume / 2, -tendon_length))
-        rectangle_isovolume.set_width(muscle_width_isovolume)
-        rectangle_isovolume.set_height(-muscle_length_isovolume)
+
+        x_array = np.linspace(5.5, 10, 30)
+        y_isovolume = np.zeros((30,))
+        for i in range(30):
+            y_isovolume[i], _, _ = isovolume_equation(x_array[i], volume)
+        plot_isovolume[0].set_ydata(y_isovolume)
 
         return
 
 
     muscle_force = slider_force.val
     volume = slider_volume.val
-    coeff = slider_coeff.val
 
     muscle_fiber_length_degroote, theta_degroote = degroote_equation(muscle_force)
     update_visual_degroote(muscle_fiber_length_degroote, theta_degroote)
 
-    muscle_fiber_length_isovolume, muscle_fiber_width_isovolume, theta_isovolume = isovolume_equation(muscle_force, volume, coeff)
-    update_visual_isovolume(muscle_fiber_length_isovolume, muscle_fiber_width_isovolume, theta_isovolume)
+    muscle_fiber_length_isovolume, muscle_fiber_width_isovolume, theta_isovolume = isovolume_equation(muscle_force, volume)
+    update_visual_isovolume(muscle_fiber_length_isovolume, muscle_fiber_width_isovolume, theta_isovolume, volume)
 
     vertical_line[0].set_xdata(np.array([muscle_force, muscle_force]))
 
@@ -197,7 +192,6 @@ def update(val):
 
 slider_force.on_changed(update)
 slider_volume.on_changed(update)
-slider_coeff.on_changed(update)
 
 # Show the plot
 plt.show()
